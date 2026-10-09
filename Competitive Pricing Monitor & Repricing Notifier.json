@@ -1,0 +1,280 @@
+{
+  "name": "Competitive Pricing Monitor & Repricing Notifier",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "ed42875a-ad27-4da5-bc9b-5c5ddfb77430",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -944,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "product_name",
+              "value": "Laptop A",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "our_price",
+              "value": 50000,
+              "type": "number"
+            },
+            {
+              "id": "a3",
+              "name": "competitor_name",
+              "value": "Competitor Store",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "competitor_price",
+              "value": 48000,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1e7b1cae-3ed3-40c3-9ce0-5f49be864566",
+      "name": "Product Price Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -720,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ourPrice = Number($json.our_price);\nconst competitorPrice = Number($json.competitor_price);\n\nreturn [{\n  json: {\n    ...$json,\n    price_difference: ourPrice - competitorPrice,\n    competitor_cheaper: competitorPrice < ourPrice\n  }\n}];"
+      },
+      "id": "857d5127-9ad0-4432-8752-b24c35c7aa2a",
+      "name": "Compare Prices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.competitor_cheaper }}",
+              "operation": "true"
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "f1e04e33-5684-4117-9214-c4db3497c074",
+      "name": "Competitor Cheaper?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const competitorPrice = Number($json.competitor_price);\nconst ourPrice = Number($json.our_price);\nconst minimumDifference = 500;\n\nconst shouldReprice = (ourPrice - competitorPrice) >= minimumDifference;\nconst recommendedPrice = shouldReprice ? competitorPrice - 100 : ourPrice;\n\nreturn [{\n  json: {\n    ...$json,\n    action: shouldReprice ? \"REPRICE\" : \"NO_CHANGE\",\n    recommended_price: recommendedPrice\n  }\n}];"
+      },
+      "id": "8ff1b75f-21d2-42cf-a70c-93867b9ef4c6",
+      "name": "Repricing Recommendation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action }}",
+              "operation": "equals",
+              "value2": "REPRICE"
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "dff14bcb-8421-442f-886b-d8b616e2c52d",
+      "name": "Reprice Required?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    alert: \"COMPETITIVE PRICE ALERT\",\n    product: $json.product_name,\n    competitor: $json.competitor_name,\n    our_price: $json.our_price,\n    competitor_price: $json.competitor_price,\n    recommended_price: $json.recommended_price,\n    action: $json.action,\n    message: `Competitor price is lower. Recommended price: ₹${$json.recommended_price}`\n  }\n}];"
+      },
+      "id": "7989b45b-ca47-409b-bff0-98e97007f671",
+      "name": "Create Price Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    timestamp: new Date().toISOString(),\n    product: $json.product_name,\n    our_price: $json.our_price,\n    competitor: $json.competitor_name,\n    competitor_price: $json.competitor_price,\n    price_difference: $json.price_difference,\n    recommended_price: $json.recommended_price,\n    action: $json.action\n  }\n}];"
+      },
+      "id": "370ddec9-3c36-48f7-b424-ae61193adcd8",
+      "name": "Price Monitoring Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        208
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Product Price Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Price Data": {
+      "main": [
+        [
+          {
+            "node": "Compare Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Prices": {
+      "main": [
+        [
+          {
+            "node": "Competitor Cheaper?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Competitor Cheaper?": {
+      "main": [
+        [
+          {
+            "node": "Repricing Recommendation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Price Monitoring Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Repricing Recommendation": {
+      "main": [
+        [
+          {
+            "node": "Reprice Required?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reprice Required?": {
+      "main": [
+        [
+          {
+            "node": "Create Price Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Price Monitoring Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Price Alert": {
+      "main": [
+        [
+          {
+            "node": "Price Monitoring Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e9d05451-1ea6-47ce-a65e-5412ab57d752",
+  "meta": {
+    "instanceId": "747b5ee22879cd23918406635853b6ce08186c154f5f6629371e84c78dfdc8a8"
+  },
+  "nodeGroups": [],
+  "id": "7g9bANDDtZbOCRbG",
+  "tags": []
+}
